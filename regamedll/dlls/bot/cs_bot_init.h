@@ -65,3 +65,30 @@ extern cvar_t cv_bot_freeze;
 #else
 extern cvar_t cv_bot_quota_match;
 #endif
+
+extern cvar_t cv_bot_rcs;
+extern cvar_t cv_bot_rcs_lerp;
+extern cvar_t cv_bot_god;
+extern cvar_t cv_bot_dont_move;
+extern cvar_t cv_bot_dont_shoot;
+extern cvar_t cv_bot_target_hitbox;
+extern cvar_t cv_bot_mimic;
+
+extern cvar_t cv_bot_nav_ignore_doors;
+extern cvar_t cv_bot_nav_ignore_breakables;
+extern cvar_t cv_bot_nav_analyze_skip_spots;
+
+extern cvar_t cv_bot_escape_guard_chance;
+extern cvar_t cv_bot_escape_rogue_chance;
+
+extern cvar_t cv_bot_reaction;
+extern cvar_t cv_bot_skill;
+extern cvar_t cv_bot_teamwork;
+extern cvar_t cv_bot_aggression;
+
+extern cvar_t cv_bot_combat_range_min;
+extern cvar_t cv_bot_combat_range_max;
+
+//for zombie plague or biohazard
+extern cvar_t cv_bot_zombie_mod;
+extern cvar_t cv_bot_zombie_mod_started;

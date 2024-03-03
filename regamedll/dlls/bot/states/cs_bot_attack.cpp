@@ -514,22 +514,15 @@ void AttackState::OnUpdate(CCSBot *me)
 		}
 		else if (gpGlobals->time >= m_nextDodgeStateTimestamp)
 		{
-			int next;
 
-			// select next dodge state that is different that our current one
-			do
+			m_dodgeState = (DodgeStateType)RANDOM_LONG(SLIDE_LEFT, SLIDE_RIGHT);
+
+			if (RANDOM_FLOAT(0, 100) < 5.0)
 			{
-				// high-skill bots may jump when first engaging the enemy (if they are moving)
-				const float jumpChance = 33.3f;
-				if (m_firstDodge && me->GetProfile()->GetSkill() > 0.5f && RANDOM_FLOAT(0, 100) < jumpChance && !me->IsNotMoving())
-					next = RANDOM_LONG(0, NUM_ATTACK_STATES - 1);
-				else
-					next = RANDOM_LONG(0, NUM_ATTACK_STATES - 2);
+				m_dodgeState = CROUCH;
 			}
-			while (!m_firstDodge && next == m_dodgeState);
 
-			m_dodgeState = (DodgeStateType)next;
-			m_nextDodgeStateTimestamp = gpGlobals->time + RANDOM_FLOAT(0.3f, 1.0f);
+			m_nextDodgeStateTimestamp = gpGlobals->time + 0.3f;
 			m_firstDodge = false;
 		}
 
@@ -549,11 +542,11 @@ void AttackState::OnUpdate(CCSBot *me)
 			me->StrafeRight();
 			break;
 		}
-		case JUMP:
+		case CROUCH:
 		{
 			if (me->m_isEnemyVisible)
 			{
-				me->Jump();
+				me->Crouch();
 			}
 			break;
 		}

@@ -85,11 +85,18 @@ public:
 		SCENARIO_DEATHMATCH,
 		SCENARIO_DEFUSE_BOMB,
 		SCENARIO_RESCUE_HOSTAGES,
-		SCENARIO_ESCORT_VIP
+		SCENARIO_ESCORT_VIP,
+		SCENARIO_ESCAPE,
+		SCENARIO_ZOMBIE_MOD
 	};
 
 	GameScenarioType GetScenario() const
 	{
+		if (cv_bot_zombie_mod.value > 0)
+		{
+			return SCENARIO_ZOMBIE_MOD;
+		}
+
 #ifdef REGAMEDLL_ADD
 		// if we have included deathmatch mode, so set the game type like SCENARIO_DEATHMATCH
 		if (cv_bot_deathmatch.value > 0)

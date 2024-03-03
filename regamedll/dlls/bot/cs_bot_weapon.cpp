@@ -27,7 +27,7 @@
 */
 
 #include "precompiled.h"
-
+#define UnitsToMeters(unit)	(unit*0.0254)
 // Fire our active weapon towards our current enemy
 // NOTE: Aiming our weapon is handled in RunBotUpkeep()
 void CCSBot::FireWeaponAtEnemy()
@@ -52,13 +52,13 @@ void CCSBot::FireWeaponAtEnemy()
 	{
 		ClearSurpriseDelay();
 
-		if (!(IsRecognizedEnemyProtectedByShield() && IsPlayerFacingMe(pEnemy))		// dont shoot at enemies behind shields
-			&& !IsActiveWeaponReloading()
+		if (!IsActiveWeaponReloading()
 			&& !IsActiveWeaponClipEmpty()
 			&& IsEnemyVisible())
 		{
 			// we have a clear shot - pull trigger if we are aiming at enemy
-			Vector2D toAimSpot = (m_aimSpot - pev->origin).Make2D();
+			Vector2D toAimSpot = (m_aimSpot - GetGunPosition()).Make2D();
+
 			float rangeToEnemy = toAimSpot.NormalizeInPlace();
 
 			const real_t halfPI = (M_PI / 180.0f);
@@ -74,7 +74,7 @@ void CCSBot::FireWeaponAtEnemy()
 			// aiming tolerance depends on how close the target is - closer targets subtend larger angles
 			real_t aimTolerance = Q_cos(Q_atan(halfSize / rangeToEnemy));
 
-			if (onTarget > aimTolerance)
+			if (onTarget >= aimTolerance)
 			{
 				bool doAttack;
 
@@ -82,9 +82,13 @@ void CCSBot::FireWeaponAtEnemy()
 				if (TheCSBots()->AllowFriendlyFireDamage())
 				{
 					if (IsFriendInLineOfFire())
+					{
 						doAttack = false;
+					}
 					else
+					{
 						doAttack = true;
+					}
 				}
 				else
 				{
@@ -92,12 +96,13 @@ void CCSBot::FireWeaponAtEnemy()
 					doAttack = true;
 				}
 
+				const float knifeRange = 75.0f; // 50.0f
+
 				if (doAttack)
 				{
 					// if we are using a knife, only swing it if we're close
 					if (IsUsingKnife())
 					{
-						const float knifeRange = 75.0f; // 50.0f
 						if (rangeToEnemy < knifeRange)
 						{
 							// since we've given ourselves away - run!
@@ -121,50 +126,27 @@ void CCSBot::FireWeaponAtEnemy()
 					}
 					else
 					{
+						// TODO: бля... боюсь нахуй челика с ножом! (тикаем нахуй)
+						const float knifeDangerRange = 196;//5 метров
+						if (!IsUsingKnife() && rangeToEnemy < knifeDangerRange)
+						{
+							ForceRun(3.0f);
+						}
+
 						PrimaryAttack();
 					}
 				}
 
 				if (IsUsingPistol())
 				{
-					// high-skill bots fire their pistols quickly at close range
-					const float closePistolRange = 999999.9f;
-					if (GetProfile()->GetSkill() > 0.75f && rangeToEnemy < closePistolRange)
-					{
-						StartRapidFire();
-
-						// fire as fast as possible
-						m_fireWeaponTimestamp = 0.0f;
-					}
-					else
-					{
-						// fire somewhat quickly
-						m_fireWeaponTimestamp = RANDOM_FLOAT(0.15f, 0.4f);
-					}
+					StartRapidFire();
+					m_fireWeaponTimestamp = 0.0001f;
 				}
 				// not using a pistol
 				else
 				{
-					const float sprayRange = 400.0f;
-					if (GetProfile()->GetSkill() < 0.5f || rangeToEnemy < sprayRange || IsUsingMachinegun())
-					{
-						// spray 'n pray if enemy is close, or we're not that good, or we're using the big machinegun
-						m_fireWeaponTimestamp = 0.0f;
-					}
-					else
-					{
-						const float distantTargetRange = 800.0f;
-						if (!IsUsingSniperRifle() && rangeToEnemy > distantTargetRange)
-						{
-							// if very far away, fire slowly for better accuracy
-							m_fireWeaponTimestamp = RANDOM_FLOAT(0.3f, 0.7f);
-						}
-						else
-						{
-							// fire short bursts for accuracy
-							m_fireWeaponTimestamp = RANDOM_FLOAT(0.15f, 0.5f); // 0.15f, 0.25f
-						}
-					}
+					//тра-та-тата
+					m_fireWeaponTimestamp = 0.0f;
 				}
 
 				// subtract system latency

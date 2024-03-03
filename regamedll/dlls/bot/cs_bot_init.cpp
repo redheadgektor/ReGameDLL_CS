@@ -67,6 +67,37 @@ cvar_t cv_bot_freeze                 = { "bot_freeze", "0", 0, 0.0f, nullptr };
 cvar_t cv_bot_quota_match            = { "bot_quota_match", "0", FCVAR_SERVER, 0.0f, nullptr };
 #endif
 
+
+cvar_t cv_bot_rcs = { "bot_rcs", "1.3", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_bot_rcs_lerp = { "bot_rcs_lerp", "0.98", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_bot_god = { "bot_god", "0", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_bot_dont_move = { "bot_dont_move", "0", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_bot_dont_shoot = { "bot_dont_shoot", "0", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_bot_target_hitbox = { "bot_target_hitbox", "7", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_bot_mimic = { "bot_mimic", "0", FCVAR_SERVER, 0.0f, nullptr };
+
+cvar_t cv_bot_nav_ignore_doors = { "bot_nav_ignore_doors", "1", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_bot_nav_ignore_breakables = { "bot_nav_ignore_breakables", "1", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_bot_nav_analyze_skip_spots = { "bot_nav_analyze_skip_spots", "0", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t updateTimesliceDuration = { "bot_nav_analyze_timeslice", "0.1", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_GenerationStepSize = { "bot_nav_analyze_stepsize", "30", FCVAR_SERVER, 0.0f, nullptr };
+
+
+cvar_t cv_bot_escape_guard_chance = { "bot_escape_guard_chance", "20", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_bot_escape_rogue_chance = { "bot_escape_rogue_chance", "5", FCVAR_SERVER, 0.0f, nullptr };
+
+cvar_t cv_bot_reaction = { "bot_reaction", "-1", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_bot_skill = { "bot_skill", "-1", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_bot_teamwork = { "bot_teamwork", "-1", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_bot_aggression = { "bot_aggression", "-1", FCVAR_SERVER, 0.0f, nullptr };
+
+cvar_t cv_bot_combat_range_min = { "bot_combat_range_min", "325", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_bot_combat_range_max = { "bot_combat_range_max", "825", FCVAR_SERVER, 0.0f, nullptr };
+
+//for zombie plague or biohazard
+cvar_t cv_bot_zombie_mod = { "bot_zombie_mod", "0", FCVAR_SERVER, 0.0f, nullptr };
+cvar_t cv_bot_zombie_mod_started = { "bot_zombie_mod_started", "0", FCVAR_SERVER, 0.0f, nullptr };
+
 void InstallBotControl()
 {
 	if (TheBots)
@@ -133,6 +164,34 @@ void Bot_RegisterCVars()
 	CVAR_REGISTER(&cv_bot_freeze);
 #endif
 
+
+	CVAR_REGISTER(&cv_bot_rcs);
+	CVAR_REGISTER(&cv_bot_rcs_lerp);
+	CVAR_REGISTER(&cv_bot_god);
+	CVAR_REGISTER(&cv_bot_dont_move);
+	CVAR_REGISTER(&cv_bot_dont_shoot);
+	CVAR_REGISTER(&cv_bot_target_hitbox);
+	CVAR_REGISTER(&cv_bot_mimic);
+
+	CVAR_REGISTER(&cv_bot_nav_ignore_doors);
+	CVAR_REGISTER(&cv_bot_nav_ignore_breakables);
+	CVAR_REGISTER(&cv_bot_nav_analyze_skip_spots);
+	CVAR_REGISTER(&updateTimesliceDuration);
+	CVAR_REGISTER(&cv_GenerationStepSize);
+
+	CVAR_REGISTER(&cv_bot_escape_guard_chance);
+	CVAR_REGISTER(&cv_bot_escape_rogue_chance);
+
+	CVAR_REGISTER(&cv_bot_reaction);
+	CVAR_REGISTER(&cv_bot_skill);
+	CVAR_REGISTER(&cv_bot_teamwork);
+	CVAR_REGISTER(&cv_bot_aggression);
+
+	CVAR_REGISTER(&cv_bot_combat_range_min);
+	CVAR_REGISTER(&cv_bot_combat_range_max);
+
+	CVAR_REGISTER(&cv_bot_zombie_mod);
+	CVAR_REGISTER(&cv_bot_zombie_mod_started);
 }
 
 // Constructor
@@ -142,16 +201,36 @@ CCSBot::CCSBot() : m_gameState(this), m_chatter(this)
 }
 
 // Prepare bot for action
-bool CCSBot::Initialize(const BotProfile *profile)
+bool CCSBot::Initialize(BotProfile *profile)
 {
 	// extend
 	CBot::Initialize(profile);
+
+	if (cv_bot_reaction.value != -1)
+	{
+		m_profile->m_reactionTime = cv_bot_reaction.value;
+	}
+
+	if (cv_bot_skill.value != -1)
+	{
+		m_profile->m_skill = cv_bot_skill.value;
+	}
+
+	if (cv_bot_teamwork.value != -1)
+	{
+		m_profile->m_teamwork = cv_bot_teamwork.value;
+	}
+
+	if (cv_bot_aggression.value != -1)
+	{
+		m_profile->m_aggression = cv_bot_aggression.value;
+	}
 
 	// CS bot initialization
 	m_diedLastRound = false;
 	m_morale = POSITIVE;		// starting a new round makes everyone a little happy
 
-	m_combatRange = RANDOM_FLOAT(325, 425);
+	m_combatRange = RANDOM_FLOAT(cv_bot_combat_range_min.value, cv_bot_combat_range_max.value);
 
 	m_navNodeList = nullptr;
 	m_currentNode = nullptr;
@@ -353,6 +432,6 @@ void CCSBot::Disconnect()
 
 	if (m_processMode != PROCESS_NORMAL)
 	{
-		hideProgressMeter();
+
 	}
 }

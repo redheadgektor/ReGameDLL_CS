@@ -290,6 +290,7 @@ set(GAMEDLL_SRCS
 	"dlls/bot/states/cs_bot_investigate_noise.cpp"
 	"dlls/bot/states/cs_bot_move_to.cpp"
 	"dlls/bot/states/cs_bot_plant_bomb.cpp"
+	"dlls/bot/states/cs_bot_move_to_use.cpp"
 	"dlls/bot/states/cs_bot_use_entity.cpp"
 	"dlls/hostage/hostage.cpp"
 	"dlls/hostage/hostage_improv.cpp"

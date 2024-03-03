@@ -155,6 +155,152 @@ void HuntState::OnUpdate(CCSBot *me)
 			}
 		}
 	}
+	else if (TheCSBots()->GetScenario() == CCSBotManager::SCENARIO_ESCAPE)
+	{
+		if (me->m_iTeam == CT)
+		{
+			if (me->GuardRandomZone())
+			{
+				me->SetTask(CCSBot::GUARD_VIP_ESCAPE_ZONE);
+				me->PrintIfWatched("Trying to beat them to an escape zone!\n");
+				me->SetDisposition(CCSBot::OPPORTUNITY_FIRE);
+				me->GetChatter()->GuardingHostageEscapeZone(IS_PLAN);
+				return;
+			}
+		}
+		if (me->m_iTeam == TERRORIST)
+		{
+			me->SetTask(CCSBot::VIP_ESCAPE);
+			me->SetDisposition(CCSBot::DispositionType::SELF_DEFENSE);
+
+			//в первую очередь ищем основное оружие
+			CArmoury* prim_ent = nullptr;
+			bool has_any_primary = me->m_bHasPrimary;
+			bool has_primary_on_map = false;
+
+			if (!has_any_primary)
+			{
+				while (prim_ent = UTIL_FindEntityByClassname(prim_ent, "armoury_entity"))
+				{
+					if (prim_ent != nullptr)
+					{
+						if (prim_ent->m_iCount > 0 &&
+							prim_ent->m_iItem == ARMOURY_MP5NAVY ||
+							prim_ent->m_iItem == ARMOURY_TMP ||
+							prim_ent->m_iItem == ARMOURY_P90 ||
+							prim_ent->m_iItem == ARMOURY_MAC10 ||
+							prim_ent->m_iItem == ARMOURY_AK47 ||
+							prim_ent->m_iItem == ARMOURY_SG552 ||
+							prim_ent->m_iItem == ARMOURY_M4A1 ||
+							prim_ent->m_iItem == ARMOURY_AUG ||
+							prim_ent->m_iItem == ARMOURY_SCOUT ||
+							prim_ent->m_iItem == ARMOURY_G3SG1 ||
+							prim_ent->m_iItem == ARMOURY_AWP ||
+							prim_ent->m_iItem == ARMOURY_M3 ||
+							prim_ent->m_iItem == ARMOURY_XM1014 ||
+							prim_ent->m_iItem == ARMOURY_M249 ||
+							prim_ent->m_iItem == ARMOURY_FAMAS ||
+							prim_ent->m_iItem == ARMOURY_SG550 ||
+							prim_ent->m_iItem == ARMOURY_GALIL ||
+							prim_ent->m_iItem == ARMOURY_UMP45
+							)
+						{
+							has_primary_on_map = true;
+							break;
+						}
+					}
+				}
+			}
+
+			//ищем гранаты
+			CArmoury* grenade_ent = nullptr;
+			bool has_any_grenade = me->HasGrenade();
+			bool has_grenades_on_map = false;
+
+			if (!has_any_grenade)
+			{
+				while (grenade_ent = UTIL_FindEntityByClassname(grenade_ent, "armoury_entity"))
+				{
+					if (grenade_ent != nullptr)
+					{
+						if (grenade_ent->m_iItem == ARMOURY_FLASHBANG || grenade_ent->m_iItem == ARMOURY_HEGRENADE || grenade_ent->m_iItem == ARMOURY_SMOKEGRENADE && grenade_ent->m_iCount > 0)
+						{
+							has_grenades_on_map = true;
+							break;
+						}
+					}
+				}
+			}
+
+			//ищем броню
+			CArmoury* armor_ent = nullptr;
+			bool has_any_armor = me->pev->armorvalue > 0;
+			bool has_armor_on_map = false;
+
+			if (!has_any_armor)
+			{
+				while (armor_ent = UTIL_FindEntityByClassname(armor_ent, "armoury_entity"))
+				{
+					if (armor_ent != nullptr && (armor_ent->m_iItem == ARMOURY_KEVLAR || armor_ent->m_iItem == ARMOURY_ASSAULT) && armor_ent->m_iCount > 0)
+					{
+						has_armor_on_map = true;
+						break;
+					}
+				}
+			}
+
+			//пиздуем за основным
+			if (prim_ent != nullptr && !has_any_primary && has_primary_on_map && prim_ent->m_iCount > 0)
+			{
+				Vector ent_point = (prim_ent->pev->absmax + prim_ent->pev->absmin) / 2.0f;
+				me->MoveTo(&ent_point, RouteType::FASTEST_ROUTE);
+				me->PrintIfWatched("I known where primary weapon!\n");
+				return;
+			}
+
+			//пиздуем за гранатами
+			if (grenade_ent != nullptr && !has_any_grenade && has_grenades_on_map && grenade_ent->m_iCount > 0)
+			{
+				Vector ent_point = (grenade_ent->pev->absmax + grenade_ent->pev->absmin) / 2.0f;
+				me->MoveTo(&ent_point, RouteType::FASTEST_ROUTE);
+				me->PrintIfWatched("I known where grenades!\n");
+				return;
+			}
+
+			//пиздуем за броней
+			if (armor_ent != nullptr && !has_any_armor && has_armor_on_map && armor_ent->m_iCount > 0)
+			{
+				Vector ent_point = (armor_ent->pev->absmax + armor_ent->pev->absmin) / 2.0f;
+				me->MoveTo(&ent_point, RouteType::FASTEST_ROUTE);
+				me->PrintIfWatched("I known where armor!\n");
+				return;
+			}
+		}
+	}
+	else if (TheCSBots()->GetScenario() == CCSBotManager::SCENARIO_ZOMBIE_MOD)
+	{
+		if (me->m_iTeam == TERRORIST && cv_bot_zombie_mod_started.value > 0)
+		{
+			//ходим, хуярим всех
+			me->SetTask(CCSBot::SEEK_AND_DESTROY);
+			me->SetDisposition(CCSBot::ENGAGE_AND_INVESTIGATE);
+		}
+		else
+		{
+			//боимся прячемся
+			me->SetTask(CCSBot::FOLLOW);
+			me->SetDisposition(CCSBot::OPPORTUNITY_FIRE);
+
+			if (RANDOM_FLOAT(0, 100) < 20)
+			{
+				if (me->TryToHide(nullptr, RANDOM_FLOAT(3, 90), RANDOM_FLOAT(500, 8192), RANDOM_LONG(0, 1) ? true : false, RANDOM_LONG(0, 1) ? true : false))
+				{
+					me->ResetStuckMonitor();
+				}
+			}
+			return;
+		}
+	}
 
 	// listen for enemy noises
 	if (me->ShouldInvestigateNoise())

@@ -746,13 +746,13 @@ bool IsGameEventAudible(GameEventType event, CBaseEntity *pEntity, CBaseEntity *
 
 	case EVENT_SMOKE_GRENADE_EXPLODED:
 		*range = 1000.0f;
-		*priority = PRIORITY_LOW;
+		*priority = PRIORITY_HIGH;
 		*isHostile = true;
 		return true;
 
 	case EVENT_GRENADE_BOUNCED:
 		*range = 500.0f;
-		*priority = PRIORITY_LOW;
+		*priority = PRIORITY_HIGH;
 		*isHostile = true;
 		return true;
 
@@ -788,6 +788,13 @@ bool IsGameEventAudible(GameEventType event, CBaseEntity *pEntity, CBaseEntity *
 		*priority = PRIORITY_MEDIUM;
 		*isHostile = false;
 		return true;
+
+	case EVENT_PLAYER_SPAWNED:
+		*range = 800.0f;
+		*priority = PRIORITY_MEDIUM;
+		*isHostile = true;
+		return true;
+
 	}
 
 	return false;

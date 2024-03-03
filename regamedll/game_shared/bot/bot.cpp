@@ -21,7 +21,7 @@ CBot::CBot()
 }
 
 // Prepare bot for action
-bool CBot::Initialize(const BotProfile *profile)
+bool CBot::Initialize(BotProfile *profile)
 {
 	m_profile = profile;
 	return true;
@@ -77,6 +77,9 @@ void CBot::BotThink()
 			ResetCommand();
 			Update();
 		}
+
+
+
 		ExecuteCommand();
 	}
 }
@@ -281,6 +284,66 @@ void CBot::ExecuteCommand()
 		ResetCommand();
 	}
 #endif
+
+	if (cv_bot_dont_move.value != 0)
+	{
+		m_forwardSpeed = m_strafeSpeed = m_verticalSpeed = 0;
+		m_buttonFlags &= ~IN_JUMP;
+		m_buttonFlags &= ~IN_MOVELEFT;
+		m_buttonFlags &= ~IN_MOVERIGHT;
+		m_buttonFlags &= ~IN_FORWARD;
+		m_buttonFlags &= ~IN_BACK;
+	}
+
+	if (cv_bot_dont_shoot.value != 0)
+	{
+		m_buttonFlags &= ~IN_ATTACK;
+	}
+
+	if (cv_bot_mimic.value != 0)
+	{
+		CBasePlayer* player = UTIL_GetLocalPlayer();
+
+		if (player)
+		{
+			//copy only actions
+			if (cv_bot_mimic.value >= 1)
+			{
+				m_buttonFlags = player->pev->button;
+
+				if (player->pev->button & IN_FORWARD) { MoveForward(); }
+				if (player->pev->button & IN_BACK) { MoveBackward(); }
+				if (player->pev->button & IN_MOVELEFT) { StrafeLeft(); }
+				if (player->pev->button & IN_MOVERIGHT) { StrafeRight(); }
+				if (player->pev->button & IN_JUMP) { Jump(); }
+				if (player->pev->button & IN_ATTACK) { PrimaryAttack(); }
+				if (player->pev->button & IN_ATTACK2) { SecondaryAttack(); }
+				if (player->pev->button & IN_USE) { UseEnvironment(); }
+				if (player->pev->button & IN_RELOAD) { Reload(); }
+			}
+			//copy moves and view angles
+			// TODO: cv_bot_mimic >= 2 not working!!!
+			else if (cv_bot_mimic.value >= 2)
+			{
+				pev->v_angle = player->pev->v_angle;
+			}
+		}
+	}
+
+	//TODO: когда выстрелов больше 1 компенсируем отдачу
+	if (GetActiveWeapon() && GetActiveWeapon()->m_flNextPrimaryAttack <= 0 && !GetActiveWeapon()->m_fInReload && (pev->button & IN_ATTACK) && GetActiveWeapon()->m_iShotsFired > 1)
+	{
+		if (cv_bot_rcs.value != 0)
+		{
+			LastPunchAngle.x = pev->punchangle.x * cv_bot_rcs.value;
+			LastPunchAngle.y = pev->punchangle.y * cv_bot_rcs.value;
+		}
+	}
+	else
+	{
+		LastPunchAngle.x *= clamp<float>(cv_bot_rcs_lerp.value, 0.01, 1);
+		LastPunchAngle.y *= clamp<float>(cv_bot_rcs_lerp.value, 0.01, 1);
+	}
 
 	// Run the command
 	PLAYER_RUN_MOVE(edict(), pev->v_angle, m_forwardSpeed, m_strafeSpeed, m_verticalSpeed, m_buttonFlags, 0, adjustedMSec);

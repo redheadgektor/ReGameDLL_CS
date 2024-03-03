@@ -5002,7 +5002,15 @@ void EXT_FUNC CmdStart(const edict_t *pEdict, const struct usercmd_s *cmd, unsig
 	if (pPlayer->pev->groupinfo)
 		UTIL_SetGroupTrace(pPlayer->pev->groupinfo, GROUP_OP_AND);
 
-	pPlayer->random_seed = random_seed;
+	//bots random_seed
+	if (!pPlayer->IsNetClient())
+	{
+		pPlayer->random_seed = (int)((gpGlobals->time - pPlayer->edict()->v.starttime) * 1000.0f);
+	}
+	else
+	{
+		pPlayer->random_seed = random_seed;
+	}
 }
 
 void EXT_FUNC CmdEnd(const edict_t *pEdict)

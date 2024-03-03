@@ -99,15 +99,16 @@ public:
 	int GetVoiceBank()      const { return m_voiceBank; }
 	bool IsValidForTeam(BotProfileTeamType team) const;
 	bool PrefersSilencer()  const { return m_prefersSilencer; }
+	float m_reactionTime;
+	float m_aggression;
+	float m_skill;
+	float m_teamwork;
 
 private:
 	void Inherit(const BotProfile *parent, const BotProfile *baseline);
 	friend class BotProfileManager;
 
 	char *m_name;
-	float m_aggression;
-	float m_skill;
-	float m_teamwork;
 
 	enum { MAX_WEAPON_PREFS = 16 };
 	int m_weaponPreference[MAX_WEAPON_PREFS];
@@ -118,7 +119,6 @@ private:
 
 	unsigned char m_difficultyFlags;
 	int m_voicePitch;
-	float m_reactionTime;
 	float m_attackDelay;
 	enum BotProfileTeamType m_teams;
 	bool m_prefersSilencer;

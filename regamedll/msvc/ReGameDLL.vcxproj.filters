@@ -561,6 +561,9 @@
     <ClCompile Include="..\public\tier0\assert_dialog.cpp">
       <Filter>public\tier0</Filter>
     </ClCompile>
+    <ClCompile Include="..\dlls\bot\states\cs_bot_move_to_use.cpp">
+      <Filter>dlls\bot\states</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\version\version.h">

@@ -93,10 +93,10 @@ protected:
 		STEADY_ON,
 		SLIDE_LEFT,
 		SLIDE_RIGHT,
-		JUMP,
+		CROUCH,
 		NUM_ATTACK_STATES
 	} m_dodgeState;
-
+	CountdownTimer m_dodgeTimer;
 	float m_nextDodgeStateTimestamp;
 	CountdownTimer m_repathTimer;
 	float m_scopeTimestamp;
@@ -285,9 +285,25 @@ public:
 	virtual const char *GetName() const { return "UseEntity"; }
 
 	void SetEntity(CBaseEntity *pEntity) { m_entity = pEntity; }
-
 private:
 	EntityHandle<CBaseEntity> m_entity;
+};
+
+class MoveToUseEntityState : public BotState
+{
+public:
+	virtual void OnEnter(CCSBot *me);
+	virtual void OnUpdate(CCSBot *me);
+	virtual void OnExit(CCSBot *me);
+	virtual const char *GetName() const { return "MoveToUseEntity"; }
+
+	void SetEntity(CBaseButton* pEntity, float time) { m_entity = pEntity; if (!m_ToUseTimer.HasStarted()) { m_ToUseTimer.Start(time); } }
+
+private:
+	BotState* oldState;
+	CBaseButton* m_entity;
+	CountdownTimer m_ToUseTimer;
+	bool use;
 };
 
 // The Counter-strike Bot
@@ -301,7 +317,7 @@ public:
 	virtual void Blind(float duration, float holdTime, float fadeTime, int alpha = 255);								// player blinded by a flashbang
 	virtual void OnTouchingWeapon(CWeaponBox *box);																		// invoked when in contact with a CWeaponBox
 
-	virtual bool Initialize(const BotProfile *profile);						// (EXTEND) prepare bot for action
+	virtual bool Initialize(BotProfile *profile);						// (EXTEND) prepare bot for action
 	virtual void SpawnBot();												// (EXTEND) spawn the bot into the game
 
 	virtual void Upkeep();													// lightweight maintenance, invoked frequently
@@ -372,6 +388,8 @@ public:
 
 	void RescueHostages();
 	void UseEntity(CBaseEntity *pEntity);				// use the entity
+	void MoveToUseEntity(CBaseButton*pEntity, float time);				// move to use the entity
+	bool IsMoveToUseEntity() const;
 
 	bool IsBuying() const;
 
@@ -658,6 +676,29 @@ public:
 	void EXPORT BotTouch(CBaseEntity *pOther);
 	bool HasAnyAmmo(CBasePlayerWeapon *weapon) const;
 
+	// instances of each possible behavior state, to avoid dynamic memory allocation during runtime
+	IdleState m_idleState;
+	HuntState m_huntState;
+	AttackState m_attackState;
+	InvestigateNoiseState m_investigateNoiseState;
+	BuyState m_buyState;
+	MoveToState m_moveToState;
+	FetchBombState m_fetchBombState;
+	PlantBombState m_plantBombState;
+	DefuseBombState m_defuseBombState;
+	HideState m_hideState;
+	EscapeFromBombState m_escapeFromBombState;
+	FollowState m_followState;
+	UseEntityState m_useEntityState;
+	MoveToUseEntityState m_moveTouseEntityState;
+	BotState* m_state;							// current behavior state
+	void SetState(BotState* state);				// set the current behavior state
+
+	void InfoChat(const char* txt, ...)
+	{
+		CONSOLE_ECHO(txt);
+	}
+	
 private:
 	friend class CCSBotManager;
 
@@ -689,24 +730,8 @@ private:
 
 	CountdownTimer m_hurryTimer;			// if valid, bot is in a hurry
 
-	// instances of each possible behavior state, to avoid dynamic memory allocation during runtime
-	IdleState m_idleState;
-	HuntState m_huntState;
-	AttackState m_attackState;
-	InvestigateNoiseState m_investigateNoiseState;
-	BuyState m_buyState;
-	MoveToState m_moveToState;
-	FetchBombState m_fetchBombState;
-	PlantBombState m_plantBombState;
-	DefuseBombState m_defuseBombState;
-	HideState m_hideState;
-	EscapeFromBombState m_escapeFromBombState;
-	FollowState m_followState;
-	UseEntityState m_useEntityState;
 
 	// TODO: Allow multiple simultaneous state machines (look around, etc)
-	void SetState(BotState *state);				// set the current behavior state
-	BotState *m_state;							// current behavior state
 	float m_stateTimestamp;						// time state was entered
 	bool m_isAttacking;							// if true, special Attack state is overriding the state machine
 
@@ -1300,8 +1325,8 @@ inline void CCSBot::ForceRun(float duration)
 
 inline void CCSBot::SetLookAngles(float yaw, float pitch)
 {
-	m_lookYaw = yaw;
-	m_lookPitch = pitch;
+	m_lookYaw = yaw - LastPunchAngle.y;
+	m_lookPitch = pitch - LastPunchAngle.x;
 }
 
 inline void CCSBot::SetForwardAngle(float angle)
@@ -1753,10 +1778,6 @@ void Bot_ServerCommand();
 void Bot_RegisterCVars();
 int GetBotFollowCount(CBasePlayer *pLeader);
 const Vector *FindNearbyRetreatSpot(CCSBot *me, float maxRange);
-
-void drawProgressMeter(float progress, char *title);
-void startProgressMeter(const char *title);
-void hideProgressMeter();
 
 bool isSniperRifle(CBasePlayerItem *item);
 float StayOnLadderLine(CCSBot *me, const CNavLadder *ladder);

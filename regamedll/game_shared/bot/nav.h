@@ -27,7 +27,7 @@
 */
 
 #pragma once
-
+#include "bot/cs_bot_init.h"
 // STL uses exceptions, but we are not compiling with them - ignore warning
 #pragma warning(disable : 4530)
 
@@ -118,25 +118,25 @@ enum NavRelativeDirType
 	NUM_RELATIVE_DIRECTIONS
 };
 
-const double GenerationStepSize = 25.0;  // (30) was 20, but bots can't always fit
-const float StepHeight          = 18.0f; // if delta Z is greater than this, we have to jump to get up
-const float JumpHeight          = 41.8f; // if delta Z is less than this, we can jump up on it
-const float JumpCrouchHeight    = 58.0f; // (48) if delta Z is less than or equal to this, we can jumpcrouch up on it
+static float GenerationStepSize = 15.0f;  // (30) was 20, but bots can't always fit
+const float StepHeight = 18.0f; // if delta Z is greater than this, we have to jump to get up
+const float JumpHeight = 48.8f; // if delta Z is less than this, we can jump up on it
+const float JumpCrouchHeight = 70.0f; // (48) if delta Z is less than or equal to this, we can jumpcrouch up on it
 
 // Strictly speaking, you CAN get up a slope of 1.643 (about 59 degrees), but you move very, very slowly
 // This slope will represent the slope you can navigate without much slowdown
 // rise/run - if greater than this, we can't move up it (de_survivor canyon ramps)
-const float MaxSlope      = 1.4f;
+static float MaxSlope = 1.4f;
 
 // instead of MaxSlope, we are using the following max Z component of a unit normal
 const float MaxUnitZSlope = 0.7f;
 
 const float BotRadius = 10.0f;  // circular extent that contains bot
-const float DeathDrop = 200.0f; // (300) distance at which we will die if we fall - should be about 600, and pay attention to fall damage during pathfind
+const float DeathDrop = 550.0f; // (300) distance at which we will die if we fall - should be about 600, and pay attention to fall damage during pathfind
 
-const float HalfHumanWidth  = 16.0f;
+const float HalfHumanWidth = 16.0f;
 const float HalfHumanHeight = 36.0f;
-const float HumanHeight     = 72.0f;
+const float HumanHeight = 72.0f;
 
 struct Extent
 {
@@ -370,15 +370,28 @@ inline bool VectorsAreEqual(const Vector *a, const Vector *b, float tolerance = 
 	return false;
 }
 
-inline bool IsEntityWalkable(entvars_t *pev, unsigned int flags)
+inline bool IsEntityWalkable(entvars_t* pev, unsigned int flags)
 {
 	// if we hit a door, assume its walkable because it will open when we touch it
 	if (FClassnameIs(pev, "func_door") || FClassnameIs(pev, "func_door_rotating"))
-		return (flags & WALK_THRU_DOORS) ? true : false;
-
+	{
+		if (cv_bot_nav_ignore_doors.value == 0)
+		{
+			return (flags & WALK_THRU_DOORS) ? true : false;
+		}
+		else
+		{
+			return true;
+		}
+	}
 	// if we hit a breakable object, assume its walkable because we will shoot it when we touch it
 	else if (FClassnameIs(pev, "func_breakable") && pev->takedamage == DAMAGE_YES)
-		return (flags & WALK_THRU_BREAKABLES) ? true : false;
+	{
+		if (cv_bot_nav_ignore_breakables.value != 0)
+		{
+			return (flags & WALK_THRU_BREAKABLES) ? true : false;
+		}
+	}
 
 	return false;
 }
@@ -388,21 +401,15 @@ inline bool IsWalkableTraceLineClear(Vector &from, Vector &to, unsigned int flag
 {
 	TraceResult result;
 	edict_t *pEntIgnore = nullptr;
-	edict_t *pEntPrev = nullptr;
 	Vector useFrom = from;
 
-	const int maxTries = 50;
-	for (int t = 0; t < maxTries; ++t)
+	while (true)
 	{
 		UTIL_TraceLine(useFrom, to, ignore_monsters, pEntIgnore, &result);
 
 		// if we hit a walkable entity, try again
 		if (result.flFraction != 1.0f && (result.pHit && IsEntityWalkable(VARS(result.pHit), flags)))
 		{
-			if (result.pHit == pEntPrev)
-				return false; // deadlock, give up
-
-			pEntPrev = pEntIgnore;
 			pEntIgnore = result.pHit;
 
 			// start from just beyond where we hit to avoid infinite loops

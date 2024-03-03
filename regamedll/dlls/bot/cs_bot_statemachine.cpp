@@ -114,6 +114,21 @@ void CCSBot::UseEntity(CBaseEntity *pEntity)
 	SetState(&m_useEntityState);
 }
 
+// Use the entity
+void CCSBot::MoveToUseEntity(CBaseButton* pEntity, float time)
+{
+	m_moveTouseEntityState.SetEntity(pEntity, time);
+	SetState(&m_moveTouseEntityState);
+}
+
+bool CCSBot::IsMoveToUseEntity() const
+{
+	if (m_state == static_cast<const BotState*>(&m_moveTouseEntityState))
+		return true;
+
+	return false;
+}
+
 // DEPRECATED: Use TryToHide() instead.
 // Move to a hiding place.
 // If 'searchFromArea' is non-NULL, hiding spots are looked for from that area first.

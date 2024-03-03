@@ -29,12 +29,13 @@
 #pragma once
 
 #include "gamerules.h"
+#include "bot/cs_bot_init.h"
 
-// 30 times per second, just like human clients
-constexpr float g_flBotCommandInterval = 1.0 / 30.0;
+// 60 times per second, just like human clients
+constexpr float g_flBotCommandInterval = 1.0 / 60.0;
 
-// full AI only 10 times per second
-constexpr float g_flBotFullThinkInterval = 1.0 / 10.0;
+// full AI only 30 times per second
+constexpr float g_flBotFullThinkInterval = 1.0 / 30.0;
 
 class BotProfile;
 
@@ -71,7 +72,7 @@ T *CreateBot(const BotProfile *profile)
 
 		FREE_PRIVATE(pentBot);
 		pBot = GetClassPtr<TWrap>((T *)VARS(pentBot));
-		pBot->Initialize(profile);
+		pBot->Initialize((BotProfile*)profile);
 
 		return pBot;
 	}
@@ -105,7 +106,7 @@ public:
 	virtual void OnTouchingWeapon(CWeaponBox *box) {}
 
 	// prepare bot for action
-	virtual bool Initialize(const BotProfile *profile);
+	virtual bool Initialize(BotProfile *profile);
 
 	virtual void SpawnBot() = 0;
 
@@ -246,6 +247,10 @@ public:
 	};
 	BotRelationshipTeam BotRelationship(CBasePlayer *pTarget) const;
 
+	// bitfield of movement buttons
+	unsigned short m_buttonFlags;
+
+
 protected:
 #ifndef REGAMEDLL_FIXES
 	// Do a "client command" - useful for invoking menu choices, etc.
@@ -253,8 +258,8 @@ protected:
 #endif
 
 	// the "personality" profile of this bot
-	const BotProfile *m_profile;
-
+	BotProfile *m_profile;
+	Vector LastPunchAngle;
 private:
 	void ResetCommand();
 	byte ThrottledMsec() const;
@@ -280,9 +285,6 @@ private:
 	float m_forwardSpeed;
 	float m_strafeSpeed;
 	float m_verticalSpeed;
-
-	// bitfield of movement buttons
-	unsigned short m_buttonFlags;
 
 	// time when we last began a jump
 	float m_jumpTimestamp;
@@ -428,6 +430,12 @@ inline bool CBot::IsPlayerLookingAtMe(CBasePlayer *pOther) const
 
 inline CBot::BotRelationshipTeam CBot::BotRelationship(CBasePlayer *pTarget) const
 {
+	//все друзья пока раунд не начался
+	if (cv_bot_zombie_mod.value > 0 && cv_bot_zombie_mod_started.value <= 0)
+	{
+		return BOT_TEAMMATE;
+	}
+
 #ifdef REGAMEDLL_ADD
 	if (CSGameRules()->IsFreeForAll())
 		return BOT_ENEMY;

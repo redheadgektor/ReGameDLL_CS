@@ -4299,6 +4299,7 @@ bool GetGroundHeight(const Vector *pos, float *height, Vector *normal)
 
 		UTIL_TraceLine(from, to, ignore_monsters, dont_ignore_glass, ignore, &result);
 
+		//TODO: нужно переделать генерировать навигацию и на ломаемых объектах
 		if (result.flFraction != 1.0f && result.pHit)
 		{
 			// ignoring any entities that we can walk through

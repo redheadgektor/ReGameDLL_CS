@@ -30,47 +30,67 @@
 
 // Face the entity and "use" it
 // NOTE: This state assumes we are standing in range of the entity to be used, with no obstructions.
-void UseEntityState::OnEnter(CCSBot *me)
+void MoveToUseEntityState::OnEnter(CCSBot *me)
 {
-	;
+	if (!FStrEq(me->m_state->GetName(), me->m_moveTouseEntityState.GetName()))
+	{
+		oldState = me->m_state;
+	}
+	Vector ent_point = (m_entity->pev->absmax + m_entity->pev->absmin) / 2.0f;
+	me->m_moveToState.SetGoalPosition(ent_point);
+	me->m_moveToState.OnEnter(me);
 }
 
-void UseEntityState::OnUpdate(CCSBot *me)
+void MoveToUseEntityState::OnUpdate(CCSBot *me)
 {
-	if (!m_entity.IsValid())
-		return;
-
-	// in the very rare situation where two or more bots "used" a hostage at the same time,
-	// one bot will fail and needs to time out of this state
-	const float useTimeout = 5.0f;
-	if (me->GetStateTimestamp() - gpGlobals->time > useTimeout)
+	//пока врем€ не кончилось пытаемс€ нажать кнопку
+	if (!m_ToUseTimer.IsElapsed())
 	{
-		me->Idle();
-		return;
-	}
+		// look at the entity
+		Vector ent_point = (m_entity->pev->absmax + m_entity->pev->absmin) / 2.0f;
+		Vector me_point = (me->pev->absmax + me->pev->absmin) / 2.0f;
 
-	// look at the entity
-	Vector pos = m_entity->pev->origin + Vector(0, 0, HumanHeight * 0.5f);
-	me->SetLookAt("Use entity", &pos, PRIORITY_HIGH);
+		Vector dir = ent_point - me_point;
 
-	// if we are looking at the entity, "use" it and exit
-	if (me->IsLookingAtPosition(&pos))
-	{
-		if (TheCSBots()->GetScenario() == CCSBotManager::SCENARIO_RESCUE_HOSTAGES
-			&& me->m_iTeam == CT
-			&& me->GetTask() == CCSBot::COLLECT_HOSTAGES)
+		if (dir.Length() <= 65)
 		{
-			// we are collecting a hostage, assume we were successful - the update check will correct us if we weren't
-			me->IncreaseHostageEscortCount();
-		}
+			me->SetLookAt("Look at button", &ent_point, PRIORITY_HIGH, 99, true, 10);
 
-		me->UseEnvironment();
-		me->Idle();
+			if (me->IsLookingAtPosition(&ent_point, 40))
+			{
+				use = !use;
+
+				if (use)
+				{
+					me->m_buttonFlags |= IN_USE;
+				}
+				else
+				{
+					me->m_buttonFlags &= ~IN_USE;
+				}
+			}
+		}
+		else
+		{
+			me->m_moveToState.SetGoalPosition(ent_point);
+			me->m_moveToState.OnEnter(me);
+			me->m_moveToState.OnUpdate(me);
+		}
+	}
+	else
+	{
+		if (oldState != nullptr)
+		{
+			me->SetState(oldState);
+		}
+		else
+		{
+			me->Idle();
+		}
 	}
 }
 
-void UseEntityState::OnExit(CCSBot *me)
+void MoveToUseEntityState::OnExit(CCSBot *me)
 {
-	me->ClearLookAt();
-	me->ResetStuckMonitor();
+	m_ToUseTimer.Reset();
 }

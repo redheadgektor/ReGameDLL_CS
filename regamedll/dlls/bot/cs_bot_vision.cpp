@@ -56,6 +56,11 @@ float StayOnLadderLine(CCSBot *me, const CNavLadder *ladder)
 // TODO: Make stiffness and turn rate constants timestep invariant.
 void CCSBot::UpdateLookAngles()
 {
+	if (cv_bot_mimic.value >= 2)
+	{
+		return;
+	}
+
 	const float deltaT = g_flBotCommandInterval;
 	float maxAccel;
 	float stiffness;
@@ -64,13 +69,13 @@ void CCSBot::UpdateLookAngles()
 	// springs are stiffer when attacking, so we can track and move between targets better
 	if (IsAttacking())
 	{
-		stiffness = 300.0f;
-		damping = 30.0f;
+		stiffness = 850.0f;
+		damping = 45.0f;
 		maxAccel = 3000.0f;
 	}
 	else
 	{
-		stiffness = 200.0f;
+		stiffness = 450.0f;
 		damping = 25.0f;
 		maxAccel = 3000.0f;
 	}
@@ -378,17 +383,20 @@ void CCSBot::UpdatePeripheralVision()
 		Vector pos;
 		for (auto &spotOrder : m_spotEncounter->spotList)
 		{
-			const Vector *spotPos = spotOrder.spot->GetPosition();
+			if (spotOrder.spot != nullptr)
+			{
+				const Vector* spotPos = spotOrder.spot->GetPosition();
 
-			pos.x = spotPos->x;
-			pos.y = spotPos->y;
-			pos.z = spotPos->z + HalfHumanHeight;
+				pos.x = spotPos->x;
+				pos.y = spotPos->y;
+				pos.z = spotPos->z + HalfHumanHeight;
 
-			if (!IsVisible(&pos, CHECK_FOV))
-				continue;
+				if (!IsVisible(&pos, CHECK_FOV))
+					continue;
 
-			// can see hiding spot, remember when we saw it last
-			SetHidingSpotCheckTimestamp(spotOrder.spot);
+				// can see hiding spot, remember when we saw it last
+				SetHidingSpotCheckTimestamp(spotOrder.spot);
+			}
 		}
 	}
 }
@@ -430,7 +438,7 @@ void CCSBot::UpdateLookAround(bool updateNow)
 		if (GetSimpleGroundHeight(&m_lastEnemyPosition, &spot.z))
 		{
 			spot.z += HalfHumanHeight;
-			SetLookAt("Last Enemy Position", &spot, PRIORITY_MEDIUM, RANDOM_FLOAT(2.0f, 3.0f), true);
+			SetLookAt("Last Enemy Position", &spot, PRIORITY_MEDIUM, RANDOM_FLOAT(0.1f, 3.0f), true);
 			return;
 		}
 	}
@@ -545,6 +553,9 @@ void CCSBot::UpdateLookAround(bool updateNow)
 
 			for (auto &spotOrder : m_spotEncounter->spotList)
 			{
+				if (spotOrder.spot == nullptr)
+					continue;
+
 				// if we have seen this spot recently, we don't need to look at it
 				if (gpGlobals->time - GetHidingSpotCheckTimestamp(spotOrder.spot) <= checkTime)
 					continue;

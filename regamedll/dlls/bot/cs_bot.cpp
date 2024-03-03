@@ -167,6 +167,11 @@ BOOL CCSBot::TakeDamage(entvars_t *pevInflictor, entvars_t *pevAttacker, float f
 		}
 	}
 
+	if (cv_bot_god.value != 0)
+	{
+		return false;
+	}
+
 	// extend
 	return CBasePlayer::TakeDamage(pevInflictor, pevAttacker, flDamage, bitsDamageType);
 }
@@ -285,10 +290,6 @@ void CCSBot::BotTouch(CBaseEntity *pOther)
 		return;
 	}
 
-	// If we won't be able to break it, don't try
-	if (pOther->pev->takedamage != DAMAGE_YES)
-		return;
-
 	if (IsAttacking())
 		return;
 
@@ -305,18 +306,18 @@ void CCSBot::BotTouch(CBaseEntity *pOther)
 #endif
 
 		Vector center = (pOther->pev->absmax + pOther->pev->absmin) / 2.0f;
-		bool breakIt = true;
+		bool breakIt = m_pathLength > 0;
 
-		if (m_pathLength)
+		//if (m_pathLength)
 		{
-			Vector goal = m_goalPosition + Vector(0, 0, HalfHumanHeight);
-			breakIt = IsIntersectingBox(pev->origin, goal, pOther->pev->absmin, pOther->pev->absmax);
+			//Vector goal = m_goalPosition + Vector(0, 0, HalfHumanHeight);
+			//breakIt = IsIntersectingBox(pev->origin, goal, pOther->pev->absmin, pOther->pev->absmax);
 		}
 
 		if (breakIt)
 		{
 			// it's breakable - try to shoot it.
-			SetLookAt("Breakable", &center, PRIORITY_HIGH, 0.2, 0, 5.0);
+			SetLookAt("Breakable", &center, PRIORITY_HIGH, 1.2, 0, 5.0);
 
 			if (IsUsingGrenade())
 			{
@@ -325,6 +326,99 @@ void CCSBot::BotTouch(CBaseEntity *pOther)
 			}
 
 			PrimaryAttack();
+		}
+	}
+
+	// See if it's door
+	if (FClassnameIs(pOther->pev, "func_door"))
+	{
+		if (m_pathLength > 0)
+		{
+			CBaseDoor* pDoor = static_cast<CBaseDoor*>(pOther);
+
+			bool isPassable = (pDoor->pev->spawnflags & SF_DOOR_PASSABLE);
+			bool useOnly = (pDoor->pev->spawnflags & SF_DOOR_USE_ONLY);
+			bool canShootForOpen = pDoor->pev->health > 0;
+
+			if (!isPassable)
+			{
+				Vector center = (pOther->pev->absmax + pOther->pev->absmin) / 2.0f;
+				Vector goal = m_goalPosition + Vector(0, 0, HalfHumanHeight);
+				bool openIt = IsIntersectingBox(pev->origin, goal, pOther->pev->absmin, pOther->pev->absmax);
+
+				if (openIt)
+				{
+					//пытаемся выстрелами открыть дверь
+					if (canShootForOpen)
+					{
+						SetLookAt("Door", &center, PRIORITY_HIGH, 1.0, 0, 5.0);
+
+						if (IsUsingGrenade())
+						{
+							EquipBestWeapon();
+						}
+
+						PrimaryAttack();
+					}
+
+					//пробуем нажать использование
+					else if (useOnly)
+					{
+						SetLookAt("Door", &center, PRIORITY_HIGH, 1.0, 0, 5.0);
+						UseEntity(pDoor);
+					}
+					else//дверь имеет кнопку нужно искать
+					{
+						CBaseButton* pSearch = nullptr;
+						CBaseButton* pButton = nullptr;
+
+						int buttons = 0;
+						Vector ent_point;
+
+						float minDist = 99999.9f;
+						while ((pSearch = UTIL_FindEntityInSphere(pSearch, pev->origin, 512)))
+						{
+							if (!FClassnameIs(pSearch->pev, "func_button"))
+								continue;
+
+							buttons++;
+
+							ent_point = (pSearch->pev->absmax + pSearch->pev->absmin) / 2.0f;
+
+							float dist = (ent_point - pev->origin).Length();
+
+							PrintIfWatched("button %i -> dist %.f | target: (%s)\n", buttons, dist, STRING(pSearch->pev->target));
+
+							if (dist < minDist)
+							{
+								minDist = dist;
+								pButton = pSearch;
+							}
+						}
+
+						PrintIfWatched("founded %i buttons\n", buttons);
+
+						if (pButton != nullptr)
+						{
+							if (FStrEq(STRING(pButton->pev->target), STRING(pDoor->pev->targetname)))
+							{
+								PrintIfWatched("found button %s target %s\n", STRING(pButton->pev->targetname), STRING(pButton->pev->target));
+
+								if (cv_bot_debug.value > 0)
+								{
+									Extent* ext = new Extent();
+									ext->hi = pButton->pev->absmax;
+									ext->lo = pButton->pev->absmin;
+									UTIL_DrawBox(ext, 5, 255, 0, 0);
+									delete ext;
+								}
+
+								MoveToUseEntity(pButton, 3);
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 }
@@ -808,6 +902,10 @@ bool CCSBot::IsHurrying() const
 		&& GetGameState()->AreAllHostagesBeingRescued())
 		return true;
 
+	//escape mode
+	if (TheCSBots()->GetScenario() == CCSBotManager::SCENARIO_ESCAPE && m_iTeam == TERRORIST)
+		return true;
+
 	return false;
 }
 
@@ -886,7 +984,7 @@ const Vector *FindNearbyRetreatSpot(CCSBot *me, float maxRange)
 
 	// collect spots that enemies cannot see
 	CollectRetreatSpotsFunctor collector(me, maxRange);
-	SearchSurroundingAreas(area, &me->pev->origin, collector, maxRange);
+	SearchSurroundingAreas(area, &me->GetGunPosition(), collector, maxRange);
 
 	if (collector.m_count == 0)
 		return nullptr;

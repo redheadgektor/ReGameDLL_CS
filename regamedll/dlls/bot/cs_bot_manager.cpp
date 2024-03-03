@@ -152,7 +152,7 @@ void CCSBotManager::StartFrame()
 		for (int z = 0; z < m_zoneCount; z++)
 		{
 			Zone *zone = &m_zone[z];
-			UTIL_DrawBox(&zone->m_extent, 1, 255, 100, 0);
+			UTIL_DrawBox(&zone->m_extent, 1, 255, 140, 0);
 		}
 	}
 }
@@ -302,7 +302,6 @@ void CCSBotManager::AddServerCommands()
 	AddServerCommand("bot_nav_place_pick");
 	AddServerCommand("bot_nav_toggle_place_mode");
 	AddServerCommand("bot_nav_toggle_place_painting");
-	AddServerCommand("bot_goto_mark");
 	AddServerCommand("bot_memory_usage");
 	AddServerCommand("bot_nav_mark_unnamed");
 	AddServerCommand("bot_nav_warp");
@@ -310,6 +309,13 @@ void CCSBotManager::AddServerCommands()
 	AddServerCommand("bot_nav_corner_raise");
 	AddServerCommand("bot_nav_corner_lower");
 	AddServerCommand("bot_nav_check_consistency");
+
+	AddServerCommand("bot_goto_mark_fast");
+	AddServerCommand("bot_goto_mark_safe");
+	AddServerCommand("bot_goto_player");
+	AddServerCommand("bot_nav_clear_hidespots");
+	AddServerCommand("bot_nav_add_hidespot_cover");
+	AddServerCommand("bot_nav_add_hidespot_sniper");
 }
 
 void CCSBotManager::ServerDeactivate()
@@ -656,7 +662,7 @@ void CCSBotManager::ServerCommand(const char *pcmd)
 	{
 		m_editCmd = EDIT_TOGGLE_PLACE_PAINTING;
 	}
-	else if (FStrEq(pcmd, "bot_goto_mark"))
+	else if (FStrEq(pcmd, "bot_goto_mark_fast"))
 	{
 		// tell the first bot we find to go to our marked area
 		CNavArea *area = GetMarkedArea();
@@ -680,8 +686,67 @@ void CCSBotManager::ServerCommand(const char *pcmd)
 					{
 						pBot->MoveTo(&area->m_center, FASTEST_ROUTE);
 					}
+				}
+			}
+		}
+	}
+	else if (FStrEq(pcmd, "bot_goto_mark_safe"))
+	{
+		// tell the first bot we find to go to our marked area
+		CNavArea* area = GetMarkedArea();
+		if (area)
+		{
+			CBaseEntity* pEntity = nullptr;
+			while ((pEntity = UTIL_FindEntityByClassname(pEntity, "player")))
+			{
+				if (!pEntity->IsPlayer())
+					continue;
 
-					break;
+				if (pEntity->IsDormant())
+					continue;
+
+				CBasePlayer* playerOrBot = GetClassPtr<CCSPlayer>((CBasePlayer*)pEntity->pev);
+
+				if (playerOrBot->IsBot())
+				{
+					CCSBot* pBot = static_cast<CCSBot*>(playerOrBot);
+
+					if (pBot)
+					{
+						pBot->MoveTo(&area->m_center, SAFEST_ROUTE);
+					}
+				}
+			}
+		}
+	}
+	else if (FStrEq(pcmd, "bot_goto_player"))
+	{
+		CBasePlayer* pPlayer = UTIL_GetLocalPlayer();
+		if (pPlayer)
+		{
+
+			for (int i = 1; i <= gpGlobals->maxClients; i++)
+			{
+				CBasePlayer* pp = UTIL_PlayerByIndex(i);
+
+				if (!pp)
+				{
+					continue;
+				}
+
+				if (pp->IsBot())
+				{
+					CBasePlayer* playerOrBot = GetClassPtr<CCSPlayer>((CBasePlayer*)pp->pev);
+
+					if (playerOrBot->IsBot())
+					{
+						CCSBot* pBot = static_cast<CCSBot*>(playerOrBot);
+
+						if (pBot)
+						{
+							pBot->MoveTo(&pPlayer->pev->origin, SAFEST_ROUTE);
+						}
+					}
 				}
 			}
 		}
@@ -741,6 +806,99 @@ void CCSBotManager::ServerCommand(const char *pcmd)
 
 		SanityCheckNavigationMap(msg);
 	}
+	else if (FStrEq(pcmd, "bot_nav_clear_hidespots"))
+	{
+		CNavArea* area = GetMarkedArea();
+		if (area)
+		{
+			CBaseEntity* pPlayer = UTIL_GetLocalPlayer();
+
+			if (pPlayer)
+			{
+				char buffer[190];
+				Q_snprintf(buffer, sizeof(buffer), "Area %i Cleared %i hiding spots\n", area->GetID(), area->m_hidingSpotList.size());
+				UTIL_SayTextAll(buffer, pPlayer);
+
+
+
+				area->m_hidingSpotList.clear();
+			}
+		}
+	}
+	else if (FStrEq(pcmd, "bot_nav_add_hidespot_cover"))
+	{
+		CNavArea* area = GetMarkedArea();
+		if (area)
+		{
+			CBaseEntity* pPlayer = UTIL_GetLocalPlayer();
+
+			if (pPlayer)
+			{
+				// eye position
+				Vector dir;
+				UTIL_MakeVectorsPrivate(pPlayer->pev->v_angle, dir, nullptr, nullptr);
+				Vector from = pPlayer->pev->origin + pPlayer->pev->view_ofs;
+				Vector to = from + 1000 * dir;
+
+				TraceResult result;
+				UTIL_TraceLine(from, to, ignore_monsters, ignore_glass, ENT(pPlayer->pev), &result);
+
+				if (result.flFraction != 1.0f)
+				{
+					Vector cursor = result.vecEndPos;
+					char buffer[190];
+					if (!area->IsHidingSpotCollision(&cursor))
+					{
+						area->m_hidingSpotList.push_back(new HidingSpot(&cursor, (IsHidingSpotInCover(&cursor)) ? HidingSpot::IN_COVER : 0));
+						Q_snprintf(buffer, sizeof(buffer), "Area %i added new hiding spot\n", area->GetID());
+						UTIL_SayTextAll(buffer, pPlayer);
+					}
+					else
+					{
+						Q_snprintf(buffer, sizeof(buffer), "Area %i spot colliding!\n", area->GetID());
+						UTIL_SayTextAll(buffer, pPlayer);
+					}
+				}
+			}
+		}
+	}
+	else if (FStrEq(pcmd, "bot_nav_add_hidespot_sniper"))
+	{
+		CNavArea* area = GetMarkedArea();
+		if (area)
+		{
+			CBaseEntity* pPlayer = UTIL_GetLocalPlayer();
+
+			if (pPlayer)
+			{
+				// eye position
+				Vector dir;
+				UTIL_MakeVectorsPrivate(pPlayer->pev->v_angle, dir, nullptr, nullptr);
+				Vector from = pPlayer->pev->origin + pPlayer->pev->view_ofs;
+				Vector to = from + 1000 * dir;
+
+				TraceResult result;
+				UTIL_TraceLine(from, to, ignore_monsters, ignore_glass, ENT(pPlayer->pev), &result);
+
+				if (result.flFraction != 1.0f)
+				{
+					Vector cursor = result.vecEndPos;
+					char buffer[190];
+					if (!area->IsHidingSpotCollision(&cursor))
+					{
+						area->m_hidingSpotList.push_back(new HidingSpot(&cursor, (IsHidingSpotInCover(&cursor)) ? HidingSpot::IDEAL_SNIPER_SPOT : 0));
+						Q_snprintf(buffer, sizeof(buffer), "Area %i added new sniper spot\n", area->GetID());
+						UTIL_SayTextAll(buffer, pPlayer);
+					}
+					else
+					{
+						Q_snprintf(buffer, sizeof(buffer), "Area %i spot colliding!\n", area->GetID());
+						UTIL_SayTextAll(buffer, pPlayer);
+					}
+				}
+			}
+		}
+		}
 }
 
 BOOL CCSBotManager::ClientCommand(CBasePlayer *pPlayer, const char *pcmd)
@@ -1163,6 +1321,13 @@ void CCSBotManager::ValidateMapData()
 			found = true;
 			isLegacy = false;
 		}
+		//побег из шоушенка
+		else if (FClassnameIs(pEntity->pev, "func_escapezone"))
+		{
+			m_gameScenario = SCENARIO_ESCAPE;
+			found = true;
+			isLegacy = false;
+		}
 
 		if (found)
 		{
@@ -1201,6 +1366,34 @@ void CCSBotManager::ValidateMapData()
 			{
 				m_zone[m_zoneCount].m_center = pEntity->pev->origin;
 				m_zone[m_zoneCount].m_isLegacy = true;
+				m_zone[m_zoneCount].m_index = m_zoneCount;
+				m_zone[m_zoneCount].m_entity = pEntity;
+				m_zoneCount++;
+			}
+			else
+			{
+				CONSOLE_ECHO("Warning: Too many zones, some will be ignored.\n");
+			}
+		}
+	}
+
+	//zones for ESCAPE
+	if (m_zoneCount == 0 && m_gameScenario == SCENARIO_ESCAPE)
+	{
+		pEntity = nullptr;
+
+		while ((pEntity = UTIL_FindEntityByClassname(pEntity, "func_escapezone")))
+		{
+			if (m_zoneCount >= MAX_ZONES)
+				break;
+
+			if (FNullEnt(pEntity->edict()))
+				break;
+
+			if (m_zoneCount < MAX_ZONES)
+			{
+				m_zone[m_zoneCount].m_center = (pEntity->pev->absmax + pEntity->pev->absmin) / 2.0f;
+				m_zone[m_zoneCount].m_isLegacy = false;
 				m_zone[m_zoneCount].m_index = m_zoneCount;
 				m_zone[m_zoneCount].m_entity = pEntity;
 				m_zoneCount++;
@@ -1531,6 +1724,16 @@ unsigned int CCSBotManager::GetPlayerPriority(CBasePlayer *pPlayer) const
 
 		break;
 	}
+
+	case SCENARIO_ESCAPE:
+	{
+		// the VIP has high priority
+		if (pBot->m_iTeam == TERRORIST)
+			return 0;
+
+		break;
+	}
+
 	}
 
 	// everyone else is ranked by their unique ID (which cannot be zero)

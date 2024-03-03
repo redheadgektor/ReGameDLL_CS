@@ -28,7 +28,8 @@
 
 #include "precompiled.h"
 
-const float updateTimesliceDuration = 0.5f;
+extern cvar_t updateTimesliceDuration;
+extern cvar_t cv_GenerationStepSize;
 
 unsigned int _generationIndex = 0; // used for iterating nav areas during generation process
 
@@ -142,34 +143,21 @@ CNavNode *CCSBot::AddNode(const Vector *destPos, const Vector *normal, NavDirTyp
 	return node;
 }
 
-void drawProgressMeter(float progress, char *title)
-{
-	MESSAGE_BEGIN(MSG_ALL, gmsgBotProgress);
-		WRITE_BYTE(BOT_PROGGRESS_DRAW);
-		WRITE_BYTE(int(progress * 100.0f));
-		WRITE_STRING(title);
-	MESSAGE_END();
-}
-
-void startProgressMeter(const char *title)
-{
-	MESSAGE_BEGIN(MSG_ALL, gmsgBotProgress);
-		WRITE_BYTE(BOT_PROGGRESS_START);
-		WRITE_STRING(title);
-	MESSAGE_END();
-}
-
-void hideProgressMeter()
-{
-	MESSAGE_BEGIN(MSG_ALL, gmsgBotProgress);
-		WRITE_BYTE(BOT_PROGGRESS_HIDE);
-	MESSAGE_END();
-}
-
 void CCSBot::StartLearnProcess()
 {
-	startProgressMeter("#CZero_LearningMap");
-	drawProgressMeter(0, "#CZero_LearningMap");
+	if (cv_GenerationStepSize.value < 15)
+	{
+		cv_GenerationStepSize.value = 15;
+	}
+
+	if (cv_GenerationStepSize.value > 60)
+	{
+		cv_GenerationStepSize.value = 60;
+	}
+
+	GenerationStepSize = cv_GenerationStepSize.value;
+	InfoChat("#CZero_LearningMap\n");
+	InfoChat("Generation Step size: %.f\n", cv_GenerationStepSize.value);
 	BuildLadders();
 
 	Vector normal;
@@ -372,7 +360,7 @@ bool CCSBot::LearnStep()
 void CCSBot::UpdateLearnProcess()
 {
 	float startTime = g_engfuncs.pfnTime();
-	while (g_engfuncs.pfnTime() - startTime < updateTimesliceDuration)
+	while (g_engfuncs.pfnTime() - startTime < updateTimesliceDuration.value)
 	{
 		if (LearnStep() == false)
 		{
@@ -390,8 +378,8 @@ void CCSBot::StartAnalyzeAlphaProcess()
 	ApproachAreaAnalysisPrep();
 	DestroyHidingSpots();
 
-	startProgressMeter("#CZero_AnalyzingHidingSpots");
-	drawProgressMeter(0, "#CZero_AnalyzingHidingSpots");
+	InfoChat("#CZero_AnalyzingHidingSpots\n");
+
 }
 
 bool CCSBot::AnalyzeAlphaStep()
@@ -401,12 +389,19 @@ bool CCSBot::AnalyzeAlphaStep()
 	if (_generationIndex < 0 || _generationIndex >= TheNavAreaList.size())
 		return false;
 
+
+	InfoChat("AnalyzeAlphaStep: nav area count %i | generationIndex %i\n", TheNavAreaList.size(), _generationIndex);
+
 	// TODO: Pretty ugly and very slow way to access element by index
 	// There is no reason not to use a vector instead of a linked list
 	const NavAreaList::const_iterator &iter = std::next(TheNavAreaList.begin(), _generationIndex - 1);
 
 	CNavArea *area = (*iter);
-	area->ComputeHidingSpots();
+
+	if (cv_bot_nav_analyze_skip_spots.value == 0)
+	{
+		area->ComputeHidingSpots();
+	}
 	area->ComputeApproachAreas();
 	return true;
 }
@@ -414,19 +409,18 @@ bool CCSBot::AnalyzeAlphaStep()
 void CCSBot::UpdateAnalyzeAlphaProcess()
 {
 	float startTime = g_engfuncs.pfnTime();
-	while (g_engfuncs.pfnTime() - startTime < updateTimesliceDuration)
+	while (g_engfuncs.pfnTime() - startTime < updateTimesliceDuration.value)
 	{
 		if (AnalyzeAlphaStep() == false)
 		{
-			drawProgressMeter(0.5f, "#CZero_AnalyzingHidingSpots");
+			InfoChat("#CZero_AnalyzingHidingSpots\n");
 			CleanupApproachAreaAnalysisPrep();
 			StartAnalyzeBetaProcess();
 			return;
 		}
 	}
 
-	float progress = (double(_generationIndex) / double(TheNavAreaList.size())) * 0.5f;
-	drawProgressMeter(progress, "#CZero_AnalyzingHidingSpots");
+	InfoChat("#CZero_AnalyzingHidingSpots %i of %i\n", _generationIndex, TheNavAreaList.size());
 }
 
 void CCSBot::StartAnalyzeBetaProcess()
@@ -448,7 +442,11 @@ bool CCSBot::AnalyzeBetaStep()
 
 	CNavArea *area = (*iter);
 	area->ComputeSpotEncounters();
-	area->ComputeSniperSpots();
+
+	if (cv_bot_nav_analyze_skip_spots.value == 0)
+	{
+		area->ComputeSniperSpots();
+	}
 
 	return true;
 }
@@ -456,18 +454,17 @@ bool CCSBot::AnalyzeBetaStep()
 void CCSBot::UpdateAnalyzeBetaProcess()
 {
 	float startTime = g_engfuncs.pfnTime();
-	while (g_engfuncs.pfnTime() - startTime < updateTimesliceDuration)
+	while (g_engfuncs.pfnTime() - startTime < updateTimesliceDuration.value)
 	{
 		if (AnalyzeBetaStep() == false)
 		{
-			drawProgressMeter(1, "#CZero_AnalyzingApproachPoints");
+			InfoChat("#CZero_AnalyzingApproachPoints");
 			StartSaveProcess();
 			return;
 		}
 	}
 
-	float progress = (double(_generationIndex) / double(TheNavAreaList.size()) + 1.0f) * 0.5f;
-	drawProgressMeter(progress, "#CZero_AnalyzingApproachPoints");
+	InfoChat("#CZero_AnalyzingApproachPoints %i of %i\n", _generationIndex, TheNavAreaList.size());
 }
 
 void CCSBot::StartSaveProcess()
@@ -492,7 +489,6 @@ void CCSBot::UpdateSaveProcess()
 	Q_snprintf(msg, sizeof(msg), "Navigation file '%s' saved.", filename);
 	HintMessageToAllPlayers(msg);
 
-	hideProgressMeter();
 	StartNormalProcess();
 
 #ifndef REGAMEDLL_FIXES

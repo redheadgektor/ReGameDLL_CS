@@ -45,63 +45,22 @@ void CCSBot::Upkeep()
 		// aim at enemy, if he's still alive
 		if (m_enemy.IsValid())
 		{
-			float feetOffset = pev->origin.z - GetFeetZ();
-
 			if (IsEnemyVisible())
 			{
-				if (GetProfile()->GetSkill() > 0.5f)
-				{
-					const float k = 3.0f;
-					m_aimSpot = (m_enemy->pev->velocity - pev->velocity) * g_flBotCommandInterval * k + m_enemy->pev->origin;
-				}
-				else
-					m_aimSpot = m_enemy->pev->origin;
+				//получаем хитбоксы противника
+				//TODO: хз почему разрабы ботов не сделали получение позиции хитбокса
+				Vector bonePosition;
+				Vector boneAngles;
 
-				bool aimBlocked = false;
-				const float sharpshooter = 0.8f;
+				m_enemy->GetBonePosition(cv_bot_target_hitbox.value, bonePosition, boneAngles);
 
-				if (IsUsingAWP() || IsUsingShotgun() || IsUsingMachinegun() || GetProfile()->GetSkill() < sharpshooter
-					|| (IsActiveWeaponRecoilHigh() && !IsUsingPistol() && !IsUsingSniperRifle()))
+				//если противник имеет щит стреляем по ногам
+				if (IsRecognizedEnemyProtectedByShield())
 				{
-					if (IsEnemyPartVisible(CHEST))
-					{
-						// No headshots, go for the chest.
-						aimBlocked = true;
-					}
+					m_enemy->GetBonePosition(28, bonePosition, boneAngles);
 				}
 
-				if (aimBlocked)
-					m_aimSpot.z -= feetOffset * 0.25f;
-
-				else if (!IsEnemyPartVisible(HEAD))
-				{
-					if (IsEnemyPartVisible(CHEST))
-					{
-						m_aimSpot.z -= feetOffset * 0.5f;
-					}
-					else if (IsEnemyPartVisible(LEFT_SIDE))
-					{
-						Vector2D to = (m_enemy->pev->origin - pev->origin).Make2D();
-						to.NormalizeInPlace();
-
-						m_aimSpot.x -= to.y * 16.0f;
-						m_aimSpot.y += to.x * 16.0f;
-						m_aimSpot.z -= feetOffset * 0.5f;
-					}
-					else if (IsEnemyPartVisible(RIGHT_SIDE))
-					{
-						Vector2D to = (m_enemy->pev->origin - pev->origin).Make2D();
-						to.NormalizeInPlace();
-
-						m_aimSpot.x += to.y * 16.0f;
-						m_aimSpot.y -= to.x * 16.0f;
-						m_aimSpot.z -= feetOffset * 0.5f;
-					}
-					else // FEET
-					{
-						m_aimSpot.z -= (feetOffset + feetOffset);
-					}
-				}
+				m_aimSpot = bonePosition;
 			}
 			else
 			{
@@ -109,11 +68,11 @@ void CCSBot::Upkeep()
 			}
 
 			// add in aim error
-			m_aimSpot.x += m_aimOffset.x;
-			m_aimSpot.y += m_aimOffset.y;
-			m_aimSpot.z += m_aimOffset.z;
+			//m_aimSpot.x += m_aimOffset.x;
+			//m_aimSpot.y += m_aimOffset.y;
+			//m_aimSpot.z += m_aimOffset.z;
 
-			Vector toEnemy = m_aimSpot - pev->origin;
+			Vector toEnemy = m_aimSpot - GetGunPosition();
 			Vector idealAngle = UTIL_VecToAngles(toEnemy);
 
 			idealAngle.x = 360.0 - idealAngle.x;
@@ -126,7 +85,7 @@ void CCSBot::Upkeep()
 		{
 			// dont look at spots just in front of our face - it causes erratic view rotation
 			const float tooCloseRange = 100.0f;
-			if ((m_lookAtSpot - pev->origin).IsLengthLessThan(tooCloseRange))
+			if ((m_lookAtSpot - GetGunPosition()).IsLengthLessThan(tooCloseRange))
 				m_lookAtSpotState = NOT_LOOKING_AT_SPOT;
 		}
 
@@ -170,8 +129,8 @@ void CCSBot::Upkeep()
 			driftAmplitude = 0.5f;
 		}
 
-		m_lookYaw += driftAmplitude * BotCOS(33.0f * gpGlobals->time);
-		m_lookPitch += driftAmplitude * BotSIN(13.0f * gpGlobals->time);
+		//m_lookYaw += driftAmplitude * BotCOS(33.0f * gpGlobals->time);
+		//m_lookPitch += driftAmplitude * BotSIN(13.0f * gpGlobals->time);
 	}
 
 #ifdef REGAMEDLL_FIXES
@@ -256,7 +215,10 @@ void CCSBot::Update()
 			float length = dir.NormalizeInPlace();
 
 			for (auto &order : m_spotEncounter->spotList) {
-				UTIL_DrawBeamPoints(m_spotEncounter->path.from + order.t * length * dir, *order.spot->GetPosition(), 3, 0, 255, 255);
+				if (order.spot != nullptr)
+				{
+					UTIL_DrawBeamPoints(m_spotEncounter->path.from + order.t * length * dir, *order.spot->GetPosition(), 3, 0, 255, 255);
+				}
 			}
 		}
 	}
@@ -275,7 +237,7 @@ void CCSBot::Update()
 		return;
 
 	// check if we are stuck
-	StuckCheck();
+	//StuckCheck();
 
 	// if our current 'noise' was heard a long time ago, forget it
 	const float rememberNoiseDuration = 20.0f;
@@ -300,10 +262,10 @@ void CCSBot::Update()
 
 	// update approach points
 	const float recomputeApproachPointTolerance = 50.0f;
-	if ((m_approachPointViewPosition - pev->origin).IsLengthGreaterThan(recomputeApproachPointTolerance))
+	if ((m_approachPointViewPosition - GetGunPosition()).IsLengthGreaterThan(recomputeApproachPointTolerance))
 	{
 		ComputeApproachPoints();
-		m_approachPointViewPosition = pev->origin;
+		m_approachPointViewPosition = GetGunPosition();
 	}
 
 	if (cv_bot_show_nav.value > 0.0f && m_lastKnownArea)
@@ -347,7 +309,7 @@ void CCSBot::Update()
 
 		if (IsUsingGrenade())
 		{
-			ThrowGrenade(&threat->pev->origin);
+			ThrowGrenade(&m_lastEnemyPosition);
 		}
 		else
 		{
@@ -445,7 +407,7 @@ void CCSBot::Update()
 				m_lastSawEnemyTimestamp = gpGlobals->time;
 				m_lastEnemyPosition = m_enemy->pev->origin;
 			}
-			else
+			else if(m_lastSawEnemyTimestamp - gpGlobals->time > RANDOM_FLOAT(0.3f, 1.0f))
 			{
 				m_isEnemyVisible = false;
 			}

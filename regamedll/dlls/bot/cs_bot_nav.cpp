@@ -113,6 +113,17 @@ void CCSBot::StuckCheck()
 					EMIT_SOUND(ENT(pev), CHAN_ITEM, "buttons/button11.wav", VOL_NORM, ATTN_NORM);
 				}
 
+				if (IsCrouching())
+				{
+					StandUp();
+				}
+				else
+				{
+					Crouch();
+				}
+
+				Jump(true);
+
 				m_isStuck = true;
 			}
 		}

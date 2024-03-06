@@ -488,68 +488,72 @@ void AttackState::OnUpdate(CCSBot *me)
 	// If sniping or crouching, stand still.
 	if (m_dodge && !me->IsUsingSniperRifle() && !m_crouchAndHold)
 	{
-		Vector toEnemy = pEnemy->pev->origin - me->pev->origin;
-		float range = toEnemy.Length2D();
-
-		const float hysterisRange = 125.0f;		// (+/-) m_combatRange
-
-		float minRange = me->GetCombatRange() - hysterisRange;
-		float maxRange = me->GetCombatRange() + hysterisRange;
-
-		// move towards (or away from) enemy if we are using a knife, behind a corner, or we aren't very skilled
-		if (me->GetProfile()->GetSkill() < 0.66f || !me->IsEnemyVisible())
+		//dont dodge when enemy use c4 or knife
+		if (pEnemy->m_pActiveItem->m_iId != WEAPON_KNIFE || pEnemy->m_pActiveItem->m_iId != WEAPON_C4)
 		{
-			if (range > maxRange)
-				me->MoveForward();
-			else if (range < minRange)
-				me->MoveBackward();
-		}
+			Vector toEnemy = pEnemy->pev->origin - me->pev->origin;
+			float range = toEnemy.Length2D();
 
-		// don't dodge if enemy is facing away
-		const float dodgeRange = 2000.0f;
-		if (range > dodgeRange || !me->IsPlayerFacingMe(pEnemy))
-		{
-			m_dodgeState = STEADY_ON;
-			m_nextDodgeStateTimestamp = 0.0f;
-		}
-		else if (gpGlobals->time >= m_nextDodgeStateTimestamp)
-		{
+			const float hysterisRange = 125.0f;		// (+/-) m_combatRange
 
-			m_dodgeState = (DodgeStateType)RANDOM_LONG(SLIDE_LEFT, SLIDE_RIGHT);
+			float minRange = me->GetCombatRange() - hysterisRange;
+			float maxRange = me->GetCombatRange() + hysterisRange;
 
-			if (RANDOM_FLOAT(0, 100) < 5.0)
+			// move towards (or away from) enemy if we are using a knife, behind a corner, or we aren't very skilled
+			if (me->GetProfile()->GetSkill() < 0.66f || !me->IsEnemyVisible())
 			{
-				m_dodgeState = CROUCH;
+				if (range > maxRange)
+					me->MoveForward();
+				else if (range < minRange)
+					me->MoveBackward();
 			}
 
-			m_nextDodgeStateTimestamp = gpGlobals->time + 0.3f;
-			m_firstDodge = false;
-		}
-
-		switch (m_dodgeState)
-		{
-		case STEADY_ON:
-		{
-			break;
-		}
-		case SLIDE_LEFT:
-		{
-			me->StrafeLeft();
-			break;
-		}
-		case SLIDE_RIGHT:
-		{
-			me->StrafeRight();
-			break;
-		}
-		case CROUCH:
-		{
-			if (me->m_isEnemyVisible)
+			// don't dodge if enemy is facing away
+			const float dodgeRange = 2000.0f;
+			if (range > dodgeRange || !me->IsPlayerFacingMe(pEnemy))
 			{
-				me->Crouch();
+				m_dodgeState = STEADY_ON;
+				m_nextDodgeStateTimestamp = 0.0f;
 			}
-			break;
-		}
+			else if (gpGlobals->time >= m_nextDodgeStateTimestamp)
+			{
+
+				m_dodgeState = (DodgeStateType)RANDOM_LONG(SLIDE_LEFT, SLIDE_RIGHT);
+
+				if (RANDOM_FLOAT(0, 100) < 5.0)
+				{
+					m_dodgeState = CROUCH;
+				}
+
+				m_nextDodgeStateTimestamp = gpGlobals->time + 0.3f;
+				m_firstDodge = false;
+			}
+
+			switch (m_dodgeState)
+			{
+			case STEADY_ON:
+			{
+				break;
+			}
+			case SLIDE_LEFT:
+			{
+				me->StrafeLeft();
+				break;
+			}
+			case SLIDE_RIGHT:
+			{
+				me->StrafeRight();
+				break;
+			}
+			case CROUCH:
+			{
+				if (me->m_isEnemyVisible)
+				{
+					me->Crouch();
+				}
+				break;
+			}
+			}
 		}
 	}
 }

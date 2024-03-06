@@ -63,7 +63,7 @@ void IdleState::OnUpdate(CCSBot* me)
 	}
 
 	// if we are in the early "safe" time, grab a knife or grenade
-	if (me->IsSafe())
+	if (me->IsSafe() && !me->GetEnemy())
 	{
 		// if we have a grenade, use it
 		if (!me->EquipGrenade())
@@ -563,13 +563,39 @@ void IdleState::OnUpdate(CCSBot* me)
 		{
 			//боимс€ пр€чемс€
 			me->SetTask(CCSBot::FOLLOW);
-			me->SetDisposition(CCSBot::OPPORTUNITY_FIRE);
+			me->SetDisposition(CCSBot::ENGAGE_AND_INVESTIGATE);
 
-			if (RANDOM_FLOAT(0, 100) < 50)
+			//говорим всем чтобы держались вместе или шли со мной
+			const float repeatTime = 15.0f;
+			if (me->GetFriendsRemaining() && TheCSBots()->GetRadioMessageInterval(EVENT_RADIO_STICK_TOGETHER_TEAM, me->m_iTeam) > repeatTime)
 			{
-				if (me->TryToHide(nullptr, RANDOM_FLOAT(3, 90), RANDOM_FLOAT(500, 8192), RANDOM_LONG(0, 1) ? true : false, RANDOM_LONG(0, 1) ? true : false))
+				me->SendRadioMessage(EVENT_RADIO_STICK_TOGETHER_TEAM);
+			}
+
+			//если нет р€дом противника пр€мчемс€
+			if (RANDOM_FLOAT(0, 100) < 20)
+			{
+				int enemies = me->GetNearbyEnemyCount();
+				int friends = me->GetNearbyFriendCount();
+				if (enemies <= 0)
 				{
-					me->ResetStuckMonitor();
+					me->TryToHide(nullptr, RANDOM_FLOAT(3, 90), RANDOM_FLOAT(500, 8192), RANDOM_LONG(0, 1) ? true : false, RANDOM_LONG(0, 1) ? true : false);
+				}
+				else
+				{
+					//орЄм всем что нужна помощь!
+					const float repeatTime = 5.0f;
+					if (me->GetFriendsRemaining() && TheCSBots()->GetRadioMessageInterval(EVENT_RADIO_NEED_BACKUP, me->m_iTeam) > repeatTime)
+					{
+						me->SendRadioMessage(EVENT_RADIO_NEED_BACKUP);
+					}
+
+					if (friends < enemies)
+					{
+						FarAwayFromPositionFunctor func(&me->pev->origin);
+						CNavArea* goalArea = FindMinimumCostArea(me->GetLastKnownArea(), func);
+						me->ComputePath(goalArea, nullptr, FASTEST_ROUTE);
+					}
 				}
 			}
 		}

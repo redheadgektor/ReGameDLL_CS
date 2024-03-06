@@ -237,7 +237,7 @@ void CCSBot::Update()
 		return;
 
 	// check if we are stuck
-	//StuckCheck();
+	StuckCheck();
 
 	// if our current 'noise' was heard a long time ago, forget it
 	const float rememberNoiseDuration = 20.0f;

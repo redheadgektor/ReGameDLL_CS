@@ -241,6 +241,20 @@ void HideState::OnUpdate(CCSBot *me)
 				}
 			}
 		}
+
+		case CCSBotManager::SCENARIO_ZOMBIE_MOD:
+			if (me->m_iTeam == TERRORIST && cv_bot_zombie_mod_started.value > 0)
+			{
+				me->Hunt();
+			}
+			else
+			{
+				if (RANDOM_FLOAT(0, 100) < 30)
+				{
+					me->Idle();
+				}
+			}
+			break;
 		}
 
 		bool isSettledInSniper = (me->IsSniper() && m_isAtSpot) ? true : false;

@@ -1483,7 +1483,7 @@ bool CCSBotManager::AddBot(const BotProfile *profile, BotProfileTeamType team)
 
 	//int nJoinedTeam;
 	ClientPutInServer(pBot->edict());
-	SET_CLIENT_KEY_VALUE(pBot->entindex(), GET_INFO_BUFFER(pBot->edict()), "*bot", "1");
+	SET_CLIENT_KEY_VALUE(pBot->entindex(), GET_INFO_BUFFER(pBot->edict()), "*sid", "90071996842377231");
 
 	pBot->m_iMenu = Menu_ChooseTeam;
 	pBot->m_iJoiningState = PICKINGTEAM;

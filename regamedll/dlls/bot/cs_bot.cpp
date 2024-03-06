@@ -296,7 +296,6 @@ void CCSBot::BotTouch(CBaseEntity *pOther)
 	// See if it's breakable
 	if (FClassnameIs(pOther->pev, "func_breakable"))
 	{
-
 #ifdef REGAMEDLL_FIXES
 		CBreakable *pBreak = static_cast<CBreakable *>(pOther);
 
@@ -308,10 +307,10 @@ void CCSBot::BotTouch(CBaseEntity *pOther)
 		Vector center = (pOther->pev->absmax + pOther->pev->absmin) / 2.0f;
 		bool breakIt = m_pathLength > 0;
 
-		//if (m_pathLength)
+		if (m_pathLength)
 		{
-			//Vector goal = m_goalPosition + Vector(0, 0, HalfHumanHeight);
-			//breakIt = IsIntersectingBox(pev->origin, goal, pOther->pev->absmin, pOther->pev->absmax);
+			Vector goal = m_goalPosition + Vector(0, 0, HalfHumanHeight);
+			breakIt = IsIntersectingBox(pev->origin, goal, pOther->pev->absmin, pOther->pev->absmax);
 		}
 
 		if (breakIt)
@@ -507,8 +506,8 @@ bool CCSBot::StayOnNavMesh()
 		to.NormalizeInPlace();
 
 		// how far to "step into" an area - must be less than min area size
-		const float stepInDist = 5.0f;
-		pos = pos + (stepInDist * to);
+		//const float stepInDist = 5.0f;
+		pos = pos + (/*stepInDist*/ * to);
 
 		MoveTowardsPosition(&pos);
 	}
